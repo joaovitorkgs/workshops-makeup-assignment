@@ -1,6 +1,6 @@
 ---
-title: "Assignment 1 - The tidyverse"
-author: "Joao Vitor Krieger Goncalves Silva - joaovitorkgs"
+title: "IDS Workshops: Make-up Assignment"
+author: "Joao Vitor Krieger | joaovitorkgs"
 date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
 output:
   html_document:
@@ -48,281 +48,115 @@ knitr::opts_chunk$set(echo = TRUE,
 ------------------------------------------------------------------------
 
 ```{r, include = T}
-# Importing the 'astronauts.csv' dataset
-library(readr)
-
-# Using pipe operators and specific functions
-library(dplyr)
-
-# Summarizing values 
-library(tidyverse)
-
-# Showing relative values as percentages
-library(scales)
-
-# Creating charts
-library(ggplot2)
-library(ggstream)
+pacman::p_load(readr,
+               dplyr,
+               tidyverse,
+               countrycode,
+               terra,
+               geodata,
+               purrr,
+               scales, 
+               ggplot2)
 ```
 
 <br>
 
-## Getting started with the Astronaut Database
+## Instructions
 
-The data this week comes from [Mariya Stavnichuk and Tatsuya Corlett](https://data.mendeley.com/datasets/86tsnnbv2w/1).
+- Choose one of the datasets that you’ve worked with in the Lab or any of the other assignments (e.g., the astronauts dataset from Assignment 1).
 
-This [article](https://www.sciencedirect.com/science/article/abs/pii/S2214552420300444) talks about the data set in greater detail.
+- Then, choose one or several of the packages presented at the workshop and use its functionality/tool to do something with the chosen dataset.
 
-> This database contains publically available information about all astronauts who participated in space missions before 15 January 2020 collected from NASA, Roscosmos, and fun-made websites. The provided information includes full astronaut name, sex, date of birth, nationality, military status, a title and year of a selection program, and information about each mission completed by a particular astronaut such as a year, ascend and descend shuttle names, mission and extravehicular activity (EVAs) durations.
-
-Credit for preparing the data set: [Georgios Karamanis](https://twitter.com/geokaramanis)
-
-You can use the data set directly by importing the csv file in the repository.
+- The output should involve at least two of the following: (a) a plot, (b) a table, and (c) modeling in some form. The format should be knitted Rmd to HTML and submitted to me via email by November 15, 6pm.
 
 ------------------------------------------------------------------------
 
-If not noted otherwise, for the following tasks, you will work only with a subset of astronauts based on their **year of birth**. The year span you are assigned depends on your first name:
+## Chosen Dataset and Packages Presented in the Workshop
 
-| Your first name starts with... | Years of birth |
-|--------------------------------|----------------|
-| A-I                            | (1921-1942]    |
-| J-R                            | (1943-1964]    |
-| S-Z                            | (1965-1983]    |
+I will be using the data from the [Stavnichuk and  Corlett](https://data.mendeley.com/datasets/86tsnnbv2w/1) article, with the specific data set prepared by [Georgios Karamanis](https://twitter.com/geokaramanis) which contains publically available information about all astronauts who participated in space missions before 15 January 2020 collected from NASA, Roscosmos, and fun-made websites. The provided information includes full astronaut name, sex, date of birth, nationality, military status, a title and year of a selection program, and information about each mission completed by a particular astronaut such as a year, ascend and descend shuttle names, mission and extravehicular activity (EVAs) durations.
 
-<br>
+As for the packages, I will be using
+
+-- INTERACTIVE PLOTS
+-- MAPS? JANITOR?
 
 ------------------------------------------------------------------------
 
-### Task 1 - Descriptives
 
-a)  How many unique astronauts were there in the full data set and how many are there in your subset? (*Note that some might have been part of multiple missions.*)
+### 1. Interactive Plot
+
 
 ```{r}
-
 
 # Importing dataset and creating subset according to year of birth
 astronauts <- read_csv("astronauts.csv")
-astronauts_subset <- astronauts %>% filter(between(year_of_birth, 1943, 1964))
 
-# Counting unique values in the full data set
-n_distinct(astronauts$name)
-
-# Counting unique values in the subset
-n_distinct(astronauts_subset$name)
-
-```
-
-b)  What is the overall share of female astronauts in the subset of data you were assigned to?
-
-```{r}
-# Creating a subset for female astronauts
-astronauts_subset_f <- astronauts_subset %>% filter(sex == "female")
-
-# Calculating share of female astronauts in the subset
-percent(n_distinct(astronauts_subset_f$name)/n_distinct(astronauts_subset$name), accuracy = .01)
-
-```
-
-<br>
-
-c)  How many (both in absolute and relative terms) astronauts were U.S. nationals in your subset?
-
-```{r}
-
-# Number of astronauts who were U.S Nationals in the subset in absolute terms
-
-# Selecting dataset
-# Filtering only US nationals
-# Counting unique values of names
-# Converting 1x1 tibble into a number
-
-astronauts_subset %>% 
-  filter(nationality == "U.S.") %>% 
-  summarise(n_distinct(name)) %>% 
-  pluck("n_distinct(name)",1)
-  
-
-# Number of astronauts who were U.S Nationals in the relative terms
-
-# Repeating previous operation to obtain unique nr. of US astronauts
-# Dividing output by total number of unique strings in 'name' column
-# Saving output as an object 
-# Rounding output and printing as percentage
-
-US_astronauts <- astronauts_subset %>% 
-  filter(nationality == "U.S.") %>% 
-  summarise(n_distinct(name)) %>% 
-  pluck("n_distinct(name)",1)/n_distinct(astronauts_subset$name)
-
-percent(US_astronauts, accuracy = .01)  
-
-```
-
-<br>
-
-d)  Create a new data set `total_hours_df` containing the unique names and the total duration of all missions in hours (`total_hrs_sum`) for each astronaut in the subset. Then, visualize the distribution of that variable using an appropriate plot type.
-
-```{r}
-
-# Creating data set
-# Subsetting main dataframe by grouped names and sum of mission hours
-
-total_hours_df <- astronauts_subset %>% 
-  group_by(name) %>% 
-  summarise(total_hrs_sum = sum(hours_mission))
-
-# Printing the resulting dataset with the 10 first observations
-
-head(total_hours_df, 10)
-
-# Visualization of the distribution of the total hours varaible
-
-histogram_total_hrs_sum <- total_hours_df %>% 
-  ggplot(aes(x = total_hrs_sum)) +
-  geom_histogram(binwidth=1000, fill="darkred",color="grey", alpha=0.9)+
-  ggtitle("Distribution of Astronauts by Total Mission Hours")+
-  labs(x = "Total Mission Hours",y = "Density", subtitle = "Bin size = 1,000")+
-  theme_minimal()
-
-histogram_total_hrs_sum
-```
-
-<br>
-
-e)  Who were the top 10 astronauts that went in the most unique missions in your subset? (*Note: There might be ties, so only print the default top 10.*)
-
-```{r}
-
-# Creating new dataset to count number of unique missions based on mission title
-total_missions_df <- astronauts_subset %>% 
-  group_by(name) %>% 
-  summarise(total_unique_missions = max(total_number_of_missions))
-
-# Merging column with the number of unique missions to the 'total_hours_df' dataframe
-total_hours_df <- cbind(total_hours_df,total_missions_df[2])
-
-# Sorting the dataframe on the number of unique missions
-total_hours_df <- total_hours_df %>% 
-  arrange(desc(total_unique_missions))
-
-# Printing the ten first observations in the sorted dataframe (top 10 astronauts that went in the most unique missions)
-total_hours_df$name[1:10]
-
-```
-
-<br>
-
-f)  Generate a table that provides the 5 astronauts with the longest names (in terms of number of characters, ignoring whitespace).
-
-```{r}
-
-# Created a new column in the subset for the names with no whitespace
-
-total_hours_df$name_trimws <- gsub(" ","",total_hours_df$name, fixed = TRUE)
-
-# Counting the number of characters in the new column without whitespace (and other special characters)
-
-total_hours_df$name_len <- nchar(total_hours_df$name_trimws)
-
-# Sorting the dataset by number of characters in the astronauts' names
-
-total_hours_df <- total_hours_df %>% 
-  arrange(desc(name_len))
-
-# Printing the name of the 5 astronauts with the longest names
-
-total_hours_df %>% 
-  select(name,name_len) %>% 
-  head(5)
-
-```
-
-<br>
-
-------------------------------------------------------------------------
-
-### Task 2 - Exploring trends in the data
-
-a)  Using the full data set, provide a plot that shows the overall share of *civilian* astronauts by the year of mission!
-
-```{r}
-
-civilian_share <- astronauts %>% 
-  group_by(year_of_mission) %>% 
-  summarize(
-    astronauts_total = n(),
-    astronauts_civilian = sum(military_civilian == "civilian")) %>% 
-  mutate(
-    civilian_percentage = astronauts_civilian/astronauts_total)
-
-civilian_share %>% 
-  ggplot(aes(x = year_of_mission, y = civilian_percentage))+
-  geom_line(color="darkgrey") +
-  geom_point(shape=21, color="grey", fill="darkblue", size=2.5)+
-  theme_classic()+
-  labs(title = "Historical share of Civilian Astronauts in Space Missions from 1960 to 2020",
-       y  = "Share of civilian astronauts per year",
-       x = "Year of Mission")
-
-```
-T
-<br>
-
-b)  Explore another relation of variables in the data set. Your analysis should (i) *use the full data set* and (ii) feature *data from several years*. Also, offer a brief description and interpretation of your findings!
-
-```{r}
-
-# Assessing which countries have sent more astronauts in mission, by counting the number of times citizens from all countries in the dataframe
-# have participated on a mission (considering total values rather than unique values)
-
-astronauts %>% 
+astronauts_subset <- astronauts %>%
   group_by(nationality) %>% 
-  tally() %>% 
-  arrange(desc(n)) %>% 
-  head(10)
-
-# Creating a dataset to calculate the proportion of American astronauts in all missions accounted for each year.
-
-US_astronauts <- astronauts %>% 
-  group_by(year_of_mission) %>% 
   summarize(
-    astronauts_total = n(),
-    astronauts_american = sum(nationality == "U.S.")) %>% 
-  mutate(
-    american_percentage = astronauts_american/astronauts_total)
+    count_astronauts = n(),
+    number_of_missions = sum(total_number_of_missions),
+    average_mission_hours = round(mean(hours_mission),2)
+    ) %>% 
+  mutate(average_missions_per_astronaut = round(number_of_missions/count_astronauts)/2)
 
-# Plotting a proportion chart indicating the number of Americans per mission per year in the dataset used.
+# Testing if my data is already clean (correct country names)
+country_codes_df <- geodata::country_codes() %>% 
+  select(ISO3, NAME) %>% 
+  rename(code = 1) %>% 
+  rename(nationality = 2)
 
-US_astronauts %>% 
-  ggplot(aes(x = year_of_mission, y = american_percentage))+
-  geom_line(color="darkgrey") +
-  geom_point(shape=21, color="grey", fill="darkred", size=2.5)+
-  theme_classic()+
-  labs(title = "U.S. Astronaut Representation in Space Missions Over Time",
-       y  = "Share of U.S. astronauts per year",
-       x = "Year of Mission")
+country_codes <-geodata::country_codes()
+
+# Selecting countries where the name is outdated or wrong
+outdated_country_names <- left_join(astronauts_subset,country_codes_df) %>% 
+  select(nationality,code) %>% 
+  filter(is.na(code))
+
+# Creating a vector of old names (to be replaced)
+old_names <- c(
+  "Czechoslovakia",
+  "Hungry",
+  "Korea",
+  "Malysia",
+  "Netherland",
+  "Republic of South Africa",
+  "U.K.",
+  "U.K./U.S.",
+  "U.S.",
+  "U.S.S.R/Russia",
+  "U.S.S.R/Ukraine",
+  "UAE"
+  )
+
+# Creating a vector of new names (replacements)
+new_names <- c(
+  "Czech Republic",
+  "Hungary",
+  "South Korea",
+  "Malaysia",
+  "Netherlands",
+  "South Africa",
+  "United Kingdom",
+  "United Kingdom",
+  "United States",
+  "Russia",
+  "Ukraine",
+  "United Arab Emirates"
+  )
+
+
+
+update_names_func <- function(df, old_names, new_names){
+  df %>% 
+    mutate(nationality = recode(nationality, !!!setNames(new_names, old_names)))
+}
+
+updated_astronauts_df <- map_df(list(astronauts_subset), update_names_func, old_names, new_names)
+
+
+nationalities_with_code <- left_join(updated_astronauts_df,country_codes_df) 
+
 
 ```
 
-::: answer
-The variables chosen as part of this second interpretation were "nationality" and "year of mission". After assessing which countries or nationalities were the most represented in the complete dataset, U.S. nationals appeared to be significantly more represented than citizens from other countries, accounting for approximately 67% of astronauts in missions in the entire time seris. Based on that, I was interested in analyzing whether there was any trend or important variation throughout the years. One hypothesis I formulated was that U.S. astronauts would account for most of the astronauts in missions in the early years, due to the space race during the Cold War, but that their presence in space would reduce through the years as more countries developed the technology and means to send their own nationals to space.
-
-The data revealed fluctuations in the share of astronauts from American nationality in the first years of the time series. Perhaps due to the initial costs and challenges of developing the needed technology to send astronauts to space in the early phase of the space race, it might not have been possible to keep a steady volume of missions, and presence in missions was dominated in some years by either the U.S. or the U.S.S.R.. In the late 60s, however, there was a bigger share of U.S. Americans among the astronauts, especially given the Apollo program and the goal of achieving the first crewed moon landing in 1969.
-
-From the mid-70s to the early 80s, the decline in the number of U.S. astronauts might be explained by NASA budget cuts and other political priorities or large expenditures, especially due to the Vietnam War. From the 80s onwards, the data correlates with the development of other major programs by NASA, such as the Space Shuttle, and joint efforts with other space agencies, such as the Apollo-Soyuz mission carried out between the United States and the Soviet Union, and the International Space Station. In terms of political priorities, this trend in the data can also be explained by the end of the Vietnam War, reinforcing the possible explanation that the war was an external shock that affected the Federal budget and NASA resources, and ultimately the number of American astronauts in space. After 1980, the data indicates a somewhat stable proportion of U.S. astronauts participating in space missions around 0.75 as a share of total astronauts in each year until 2010, when there was a bigger drop. This correlates also with another big external shock, which was the recession in the late 2000s, which may have also affected budget expenditures and political priorities.
-
-The data seems to confirm, to a certain extent, my initial hypothesis that the proportion of U.S. nationals would decrease throughout the years, showing a sharper decline in more recent years, as the participation of astronauts from other nationalities increased through the years (especially as agencies from other regions developed their activities, such as in Europe, China, Japan, and India), and due to external shocks. Another factor might have been the change of policy related to space missions, as recent efforts may have lacked the political support (or importance) that the Apollo missions had to justify independent human spaceflight capacities. For security reasons, though, it is arguably still in the interest of the U.S. to preserve American domination. As a result, the proportion of U.S. nationals in space missions has been increasing again in recent years to around 0.5, as other models (such as partnerships with the private sector) are being developed. More data might be necessary to identify whether this trend has continued.
-
---
-
-Sources:
-
-Danilin I.V. NASA, Astropreneurs and future markets: new models of the U.S. innovation policy for space industry. Outlines of global transformations: politics, economics, law. 2018;11(2):166-183. (In Russ., with AI translation). https://doi.org/10.23932/2542-0240-2018-11-2-166-183
-
-Jones, H. W. (2015, July 12-16). Success Factors in Human Space Programs - Why Did Apollo Succeed Better Than Later Programs? [Conference paper]. International Conference on Environmental Systems, Bellevue, WA, United States. NASA Technical Reports Server. https://ntrs.nasa.gov/citations/20160001259
-
-Logsdon, J. M., “Change and continuity in US space policy,” Space Policy 27, 2011. https://doi.org/10.1016/j.spacepol.2010.12.005
-
-:::
-
-<br>
