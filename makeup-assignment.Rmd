@@ -56,7 +56,11 @@ pacman::p_load(readr,
                geodata,
                purrr,
                scales, 
-               ggplot2)
+               ggplot2,
+               plotly,
+               janitor,
+               lubridate)
+
 ```
 
 <br>
@@ -71,44 +75,74 @@ pacman::p_load(readr,
 
 ------------------------------------------------------------------------
 
+<br>
+
 ## Chosen Dataset and Packages Presented in the Workshop
 
 I will be using the data from the [Stavnichuk and  Corlett](https://data.mendeley.com/datasets/86tsnnbv2w/1) article, with the specific data set prepared by [Georgios Karamanis](https://twitter.com/geokaramanis) which contains publically available information about all astronauts who participated in space missions before 15 January 2020 collected from NASA, Roscosmos, and fun-made websites. The provided information includes full astronaut name, sex, date of birth, nationality, military status, a title and year of a selection program, and information about each mission completed by a particular astronaut such as a year, ascend and descend shuttle names, mission and extravehicular activity (EVAs) durations.
 
-As for the packages, I will be using
+As for the packages, I will be using Janitor, Lubridate, and Plotly. The goal of the task will be to clean the data set, create a variable of interest which is time-relevant, and create an interactive plot.
 
--- INTERACTIVE PLOTS
--- MAPS? JANITOR?
 
 ------------------------------------------------------------------------
 
+<br>
 
-### 1. Interactive Plot
+### 1. Data Cleaning with Janitor and Dplyr, and adding a new variable using Lubridate
 
+The first part of the task consisted of importing the data and preparing the data for the plot. In this part, I have also did an analysis of variables as demonstrated in the Janitor workshop.
 
 ```{r}
 
 # Importing dataset and creating subset according to year of birth
 astronauts <- read_csv("astronauts.csv")
 
-astronauts_subset <- astronauts %>%
+# Adjusting column names and using the Janitor package.
+astronauts_clean <- astronauts %>% 
+  clean_names() %>% 
+  remove_empty()
+
+print(colnames(astronauts_clean))
+
+# Storing the date of the dataset (15 January 2020)  as an object
+date_of_dataset <- make_date(2020,01,15)
+
+
+astronauts_clean_duration <- astronauts_clean %>% 
+  mutate(date_mission = make_date(year_of_mission,1,1)) %>% 
+  mutate(time_since_mission = as.duration(date_of_dataset - date_mission))
+
+astronauts_clean_duration <- astronauts_clean %>% 
+  mutate(date_mission = make_date(year_of_mission,1,1)) %>% 
+  mutate(time_since_mission = interval(date_mission, date_of_dataset)/years(1))
+
+```
+
+<br>
+
+With the clean data and the new variable, I then prepared a subset which summarizes the entire dataset to some variables of interest for the second part of the task.
+
+```{r}
+astronauts_subset <- astronauts_clean_duration %>%
   group_by(nationality) %>% 
   summarize(
     count_astronauts = n(),
-    number_of_missions = sum(total_number_of_missions),
-    average_mission_hours = round(mean(hours_mission),2)
-    ) %>% 
-  mutate(average_missions_per_astronaut = round(number_of_missions/count_astronauts)/2)
+    last_mission = round(min(time_since_mission),2))
+```
 
-# Testing if my data is already clean (correct country names)
+<br>
+
+Given that the country names used correspond to older names or with spelling mistakes, I corrected the names by using a data set from the geodata package. I also used this package to add international country codes, which will be necessary for the following step (which is plotting the countries and the variable chosen on a map).
+
+```{r}
+
+# Importing the "country_codes" data set from the geodata package
 country_codes_df <- geodata::country_codes() %>% 
   select(ISO3, NAME) %>% 
   rename(code = 1) %>% 
   rename(nationality = 2)
 
-country_codes <-geodata::country_codes()
-
-# Selecting countries where the name is outdated or wrong
+# Testing which countries have an outdated or misspelled name
 outdated_country_names <- left_join(astronauts_subset,country_codes_df) %>% 
   select(nationality,code) %>% 
   filter(is.na(code))
@@ -145,18 +179,43 @@ new_names <- c(
   "United Arab Emirates"
   )
 
-
-
+# Creating a function to substitute the names
 update_names_func <- function(df, old_names, new_names){
   df %>% 
     mutate(nationality = recode(nationality, !!!setNames(new_names, old_names)))
 }
 
+# Changing the names by iterating on the names vector with a map_df function
 updated_astronauts_df <- map_df(list(astronauts_subset), update_names_func, old_names, new_names)
 
-
+# Adding the country codes to the data set, so that I can use them with the plot_ly function
 nationalities_with_code <- left_join(updated_astronauts_df,country_codes_df) 
 
+```
+
+<br>
+
+### 2. Plotting an interactive map with the used data set
+
+```{r}
+
+# Plotting an interactive map showing the time passed since the last mission, as of the publication of the dataset
+
+map <- plot_ly(
+  data=nationalities_with_code,
+  type='choropleth',
+  locations=nationalities_with_code$code,
+  z=nationalities_with_code$last_mission,
+  text=nationalities_with_code$nationality,
+  colorscale="YlOrRd") %>% 
+  layout(title = "Astronaut Missions by Country: <br> Years Since Last Mission (as of 15 January 2020)")
+
+map
 
 ```
+
+
+
+
+
 
